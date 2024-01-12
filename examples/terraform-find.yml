@@ -1,0 +1,17 @@
+generators:
+- detector:
+    type: DIRECOTRY_HAS_FILE_FILE_MATCHING
+    config:
+      regex: ".*.tf"
+  generated_block:
+    package-ecosystem: terraform
+    schedule:
+      interval: daily
+- detector:
+    type: DIRECOTRY_HAS_FILE_FILE_MATCHING
+    config:
+      regex: ".*.hcl"
+  generated_block:
+    package-ecosystem: terraform
+    schedule:
+      interval: daily
