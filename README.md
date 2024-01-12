@@ -1,2 +1,2 @@
-# dependabot-config-generator
-Generate dependabot configuration files
+# monorepo-dependabot-config/
+Generate dependabot configuration files for a monorepo
