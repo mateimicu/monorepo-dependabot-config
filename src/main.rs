@@ -1,6 +1,4 @@
 use clap::Parser;
-use env_logger;
-use log;
 use regex::Regex;
 use std::fs::read_dir;
 use std::path::PathBuf;
@@ -29,7 +27,7 @@ fn detector_has_file_matching(dir_path: PathBuf, regex_pattern: String) -> bool 
             }
         }
     }
-    return false;
+    false
 }
 pub fn run_detector(
     detector_type: String,
@@ -47,11 +45,11 @@ pub fn run_detector(
     match detector_type.as_str() {
         "DIRECOTRY_HAS_FILE_FILE_MATCHING" => {
             let regex_pattern = detector_config["regex"].as_str().unwrap();
-            return detector_has_file_matching(dir_path, regex_pattern.to_string());
+            detector_has_file_matching(dir_path, regex_pattern.to_string())
         }
         _ => {
             log::debug!("Unknown detector type {}", detector_type);
-            return false;
+            false
         }
     }
 }
@@ -109,7 +107,7 @@ pub fn generate_dependabot_config(config: Config, search_dir: PathBuf) -> serde_
             }
         }
     }
-    return dependabot_config;
+    dependabot_config
 }
 
 pub fn load_configs(
@@ -131,7 +129,7 @@ pub fn load_configs(
     } else {
         log::debug!("No extra configuration file defined");
     }
-    return config;
+    config
 }
 
 fn main() {
