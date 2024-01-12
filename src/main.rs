@@ -67,7 +67,7 @@ pub fn generate_dependabot_config(config: Config, search_dir: PathBuf) -> serde_
     dependabot_config["version"] = serde_yaml::Value::String("2".to_string());
     dependabot_config["updates"] = serde_yaml::Value::Sequence(serde_yaml::Sequence::new());
     // search recursevely the search_dir
-    let walker = walkdir::WalkDir::new(search_dir);
+    let walker = walkdir::WalkDir::new(search_dir.clone());
     for entry in walker {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -91,7 +91,14 @@ pub fn generate_dependabot_config(config: Config, search_dir: PathBuf) -> serde_
                     let mut generated_block = generated_block.clone();
                     generated_block.insert(
                         serde_yaml::Value::String("directory".to_string()),
-                        serde_yaml::Value::String(path.to_str().unwrap().to_string()),
+                        // remove the search_dir from the path
+                        serde_yaml::Value::String(
+                            path.strip_prefix(search_dir.clone())
+                                .unwrap()
+                                .to_str()
+                                .unwrap()
+                                .to_string(),
+                        ),
                     );
                     let generated_block = serde_yaml::Value::Mapping(generated_block);
                     dependabot_config["updates"]
