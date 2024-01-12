@@ -1,51 +1,16 @@
+use clap::Parser;
 use env_logger;
 use log;
 use regex::Regex;
 use std::fs::read_dir;
 use std::path::PathBuf;
+use strucs::{Cli, Config};
 
-use clap::Parser;
-use serde::{Deserialize, Serialize};
+mod strucs;
 
-#[derive(Parser)]
-struct Cli {
-    // If you want to use the built  in rules
-    #[arg(short, long, default_value_t = false)]
-    enable_default_rules: bool,
+// include string from file
+const DEFAULT_RULES: &str = include_str!("default_rules.yaml");
 
-    // Custom cofiguration file to use.
-    #[arg(short = 'c', long)]
-    extra_configuration_file: Option<PathBuf>,
-
-    // the directory to search pachages in
-    #[clap(default_value = ".")]
-    search_dir: PathBuf,
-    // Ideas:
-    // *  We could also add a command to check if a generated config matches
-    //    the current configuration given the path
-    // * Also we could configure if we dump the generated config to stdout
-    //   or to a file
-}
-
-#[derive(Deserialize, Serialize)]
-struct Detector {
-    #[serde(rename = "type")]
-    type_: String,
-    config: serde_yaml::Value,
-}
-
-#[derive(Deserialize, Serialize)]
-struct Generator {
-    detector: Detector,
-    // this can be any yaml value
-    generated_block: serde_yaml::Value,
-}
-
-#[derive(Deserialize, Serialize)]
-struct Config {
-    // The rules to run
-    generators: Vec<Generator>,
-}
 fn detector_has_file_matching(dir_path: PathBuf, regex_pattern: String) -> bool {
     let re = Regex::new(&regex_pattern).unwrap();
     // list all files in the directory top level
@@ -142,22 +107,25 @@ fn generate_config(config: Config, search_dir: PathBuf) -> String {
 
 fn main() {
     let args = Cli::parse();
+    log::debug!("Args: {:?}", args);
     env_logger::init();
-    // TODO(mmicu): if args.enable_default_rules is defined we
-    // should load the default rules from the default location (
-    // or ideally from an embedded string)
-    // combine it with the read configuration file and then
-    // run the rules on the search_dir
-    //
-    // For now will just use the extra_configuration_file
-    // if it is defined
+
+    let mut config: Config = Config {
+        generators: Vec::new(),
+    };
+    if args.enable_default_rules {
+        log::debug!("Default rules are enabled");
+        config = serde_yaml::from_str(DEFAULT_RULES).unwrap();
+    }
     if let Some(extra_configuration_file) = args.extra_configuration_file {
         let raw_config = std::fs::read_to_string(extra_configuration_file).unwrap();
-        let config: Config = serde_yaml::from_str(&raw_config).unwrap();
-
-        let dependabot_config = generate_config(config, args.search_dir);
-        println!("{}", dependabot_config);
+        let extra_config: Config = serde_yaml::from_str(&raw_config).unwrap();
+        // Note that this is a simple overwrite because we only have generators
+        config.generators.extend(extra_config.generators);
     } else {
-        println!("No extra configuration file defined");
+        log::debug!("No extra configuration file defined");
     }
+
+    let dependabot_config = generate_config(config, args.search_dir);
+    println!("{}", dependabot_config);
 }
