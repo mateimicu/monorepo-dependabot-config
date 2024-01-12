@@ -31,7 +31,7 @@ fn detector_has_file_matching(dir_path: PathBuf, regex_pattern: String) -> bool 
     }
     return false;
 }
-fn run_detector(
+pub fn run_detector(
     detector_type: String,
     detector_config: serde_yaml::Value,
     dir_path: PathBuf,
@@ -56,7 +56,7 @@ fn run_detector(
     }
 }
 
-fn generate_config(config: Config, search_dir: PathBuf) -> String {
+pub fn generate_dependabot_config(config: Config, search_dir: PathBuf) -> serde_yaml::Value {
     // recursevely search the search_dir
     // for each directory found run the generator
     // for each generator call the appropiate Detector
@@ -102,22 +102,21 @@ fn generate_config(config: Config, search_dir: PathBuf) -> String {
             }
         }
     }
-    return serde_yaml::to_string(&dependabot_config).unwrap();
+    return dependabot_config;
 }
 
-fn main() {
-    let args = Cli::parse();
-    log::debug!("Args: {:?}", args);
-    env_logger::init();
-
+pub fn load_configs(
+    enable_default_rules: bool,
+    extra_configuration_file: Option<PathBuf>,
+) -> Config {
     let mut config: Config = Config {
         generators: Vec::new(),
     };
-    if args.enable_default_rules {
+    if enable_default_rules {
         log::debug!("Default rules are enabled");
         config = serde_yaml::from_str(DEFAULT_RULES).unwrap();
     }
-    if let Some(extra_configuration_file) = args.extra_configuration_file {
+    if let Some(extra_configuration_file) = extra_configuration_file {
         let raw_config = std::fs::read_to_string(extra_configuration_file).unwrap();
         let extra_config: Config = serde_yaml::from_str(&raw_config).unwrap();
         // Note that this is a simple overwrite because we only have generators
@@ -125,7 +124,17 @@ fn main() {
     } else {
         log::debug!("No extra configuration file defined");
     }
+    return config;
+}
 
-    let dependabot_config = generate_config(config, args.search_dir);
-    println!("{}", dependabot_config);
+fn main() {
+    let args = Cli::parse();
+    log::debug!("Args: {:?}", args);
+    env_logger::init();
+
+    let config = load_configs(args.enable_default_rules, args.extra_configuration_file);
+
+    let dependabot_config = generate_dependabot_config(config, args.search_dir);
+
+    println!("{}", serde_yaml::to_string(&dependabot_config).unwrap());
 }
