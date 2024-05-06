@@ -2,6 +2,11 @@
 
 * [ ] Add integration tests (at least a few examples)
 * [ ] Populate the default rules with some common values (py, js, ts, terraform etc)
+* [ ] Add `clippy` to the CI
+* [ ] Add `lintrule` to the CI
+* [ ] Add `cargo fmt` to the CI
+* [ ] Add `cargo doc` to the CI
+* [ ] Publish the crate on tag
   * [ ] Start a page with supported selectors and rules by default
 * [ ] Add docs about how to run locally and in CI
 * [ ] Add tests on common examples
