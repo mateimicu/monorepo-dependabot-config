@@ -1,0 +1,18 @@
+version: '2'
+updates:
+- package-ecosystem: terraform
+  schedule:
+    interval: daily
+  directory: 01-has-tf
+- package-ecosystem: terraform
+  schedule:
+    interval: daily
+  directory: 02-has-hcl
+- package-ecosystem: terraform
+  schedule:
+    interval: daily
+  directory: 05-nested/01-has-tf
+- package-ecosystem: terraform
+  schedule:
+    interval: daily
+  directory: 05-nested/02-has-hcl

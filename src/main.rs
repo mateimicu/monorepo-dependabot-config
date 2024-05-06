@@ -1,6 +1,4 @@
 use clap::Parser;
-use env_logger;
-use log;
 use regex::Regex;
 use std::fs::read_dir;
 use std::path::PathBuf;
@@ -29,9 +27,9 @@ fn detector_has_file_matching(dir_path: PathBuf, regex_pattern: String) -> bool 
             }
         }
     }
-    return false;
+    false
 }
-fn run_detector(
+pub fn run_detector(
     detector_type: String,
     detector_config: serde_yaml::Value,
     dir_path: PathBuf,
@@ -47,16 +45,16 @@ fn run_detector(
     match detector_type.as_str() {
         "DIRECOTRY_HAS_FILE_FILE_MATCHING" => {
             let regex_pattern = detector_config["regex"].as_str().unwrap();
-            return detector_has_file_matching(dir_path, regex_pattern.to_string());
+            detector_has_file_matching(dir_path, regex_pattern.to_string())
         }
         _ => {
             log::debug!("Unknown detector type {}", detector_type);
-            return false;
+            false
         }
     }
 }
 
-fn generate_config(config: Config, search_dir: PathBuf) -> String {
+pub fn generate_dependabot_config(config: Config, search_dir: PathBuf) -> serde_yaml::Value {
     // recursevely search the search_dir
     // for each directory found run the generator
     // for each generator call the appropiate Detector
@@ -67,7 +65,7 @@ fn generate_config(config: Config, search_dir: PathBuf) -> String {
     dependabot_config["version"] = serde_yaml::Value::String("2".to_string());
     dependabot_config["updates"] = serde_yaml::Value::Sequence(serde_yaml::Sequence::new());
     // search recursevely the search_dir
-    let walker = walkdir::WalkDir::new(search_dir);
+    let walker = walkdir::WalkDir::new(search_dir.clone());
     for entry in walker {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -91,7 +89,14 @@ fn generate_config(config: Config, search_dir: PathBuf) -> String {
                     let mut generated_block = generated_block.clone();
                     generated_block.insert(
                         serde_yaml::Value::String("directory".to_string()),
-                        serde_yaml::Value::String(path.to_str().unwrap().to_string()),
+                        // remove the search_dir from the path
+                        serde_yaml::Value::String(
+                            path.strip_prefix(search_dir.clone())
+                                .unwrap()
+                                .to_str()
+                                .unwrap()
+                                .to_string(),
+                        ),
                     );
                     let generated_block = serde_yaml::Value::Mapping(generated_block);
                     dependabot_config["updates"]
@@ -102,22 +107,21 @@ fn generate_config(config: Config, search_dir: PathBuf) -> String {
             }
         }
     }
-    return serde_yaml::to_string(&dependabot_config).unwrap();
+    dependabot_config
 }
 
-fn main() {
-    let args = Cli::parse();
-    log::debug!("Args: {:?}", args);
-    env_logger::init();
-
+pub fn load_configs(
+    enable_default_rules: bool,
+    extra_configuration_file: Option<PathBuf>,
+) -> Config {
     let mut config: Config = Config {
         generators: Vec::new(),
     };
-    if args.enable_default_rules {
+    if enable_default_rules {
         log::debug!("Default rules are enabled");
         config = serde_yaml::from_str(DEFAULT_RULES).unwrap();
     }
-    if let Some(extra_configuration_file) = args.extra_configuration_file {
+    if let Some(extra_configuration_file) = extra_configuration_file {
         let raw_config = std::fs::read_to_string(extra_configuration_file).unwrap();
         let extra_config: Config = serde_yaml::from_str(&raw_config).unwrap();
         // Note that this is a simple overwrite because we only have generators
@@ -125,7 +129,17 @@ fn main() {
     } else {
         log::debug!("No extra configuration file defined");
     }
+    config
+}
 
-    let dependabot_config = generate_config(config, args.search_dir);
-    println!("{}", dependabot_config);
+fn main() {
+    let args = Cli::parse();
+    log::debug!("Args: {:?}", args);
+    env_logger::init();
+
+    let config = load_configs(args.enable_default_rules, args.extra_configuration_file);
+
+    let dependabot_config = generate_dependabot_config(config, args.search_dir);
+
+    println!("{}", serde_yaml::to_string(&dependabot_config).unwrap());
 }
