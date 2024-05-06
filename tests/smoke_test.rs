@@ -30,8 +30,8 @@ fn execute_examples_with_no_default_config() {
             serde_yaml::from_str(&expected_output_raw).unwrap();
         let output: serde_yaml::Value = serde_yaml::from_str(&output_raw).unwrap();
 
-        println!("Expected output: {:?}", expected_output);
-        println!("Output: {:?}", output);
+        println!("Expected output: {:#?}", expected_output);
+        println!("Output: {:#?}", output);
 
         // write this to a file
         assert_eq!(expected_output, output);
