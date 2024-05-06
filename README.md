@@ -1,8 +1,21 @@
 # monorepo-dependabot-config
 
-Generate dependabot configuration files
+*Problem:* Dependabot configuration files are hard to maintain in a monorepo. It can't auto discover the different package ecosystems in the monorepo.
+*Solution:* A tool that can auto generate dependabot configuration files based on the package ecosystems in the monorepo.
 
- This is a Work in Progress !
+## Features
+
+- [x] Generate dependabot configuration files based on the package ecosystems
+- [x] Detect package ecosystems based on the files in the monorepo
+- [x] Have a configuration file to specify extra rules
+- [~] Have default rules for common package ecosystems
+
+## Quick Star
+
+Just run the `monorepo-dependabot-config .` command in the root of your monorepo.
+It will generate a dependabot configuration file based on the package ecosystems it finds in the monorepo.
+
+You can also run this in CI to validate no package/project is left behind.
 
 ## How to install
 
@@ -57,22 +70,6 @@ generators:
 ```
 
 
-## To Do
-
-* [ ] Add integration tests (at least a few examples)
-* [ ] Populate the default rules with some common values (py, js, ts, terraform etc)
-  * [ ] Start a page with supported selectors and rules by default
-* [ ] Add docs about how to run locally and in CI
-* [ ] Add tests on common examples
-* [ ] Add a cli option to check if all the packages are monitored. It can be a simple generate new config 
-      deep compare with what is in the repository
-* [ ] Consider adding extra detector types
-  * [ ] HAS_FILE
-  * [ ] HAS_DIRECOTRY_REGEX -> can be used to detect if we are in a git repo or have a .github directory
-  * [ ] HAS_FILE_WITH_CONTENT_MATCHING
-  * [ ] HAS_FILE_DEEP_PATH -
-* [ ] Question: should we remove `type` and rely on a name only ?
-
 ### Other detectors
 
 We could also have some detectors detectors:
@@ -98,7 +95,8 @@ generators:
 ### Alternative usage
 
 The config file could have
-```
+
+```yaml
 generate:
 - detector:
   direcotry-has-file-file-matching:
