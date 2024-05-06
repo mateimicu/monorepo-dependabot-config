@@ -33,7 +33,18 @@ fn execute_examples_with_no_default_config() {
         println!("Expected output: {:#?}", expected_output);
         println!("Output: {:#?}", output);
 
-        // write this to a file
-        assert_eq!(expected_output, output);
+        assert_eq!(expected_output["version"], output["version"]);
+
+        // Because we have a list of `updates` the order matters. Depending
+        // on the OS we might have different orderings. So we need to compare
+        // the sets of updates
+        let updates_expected_output = expected_output["updates"].as_sequence().unwrap();
+        let updates_output = output["updates"].as_sequence().unwrap();
+
+        let set_expected_output: std::collections::HashSet<_> =
+            updates_expected_output.iter().collect();
+        let set_output: std::collections::HashSet<_> = updates_output.iter().collect();
+
+        assert_eq!(set_expected_output, set_output);
     }
 }
