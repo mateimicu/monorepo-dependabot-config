@@ -60,18 +60,7 @@ src/
 - Functions that can fail (`load_configs`, `generate_dependabot_config`, `run_detector`, `detector_has_file_matching`) return `anyhow::Result<T>` instead of bare `T`
 - `run_detector` returns `anyhow::Result<bool>`, not `bool`
 
-### ADR-2: serde_yaml → serde_yml Migration
-
-**Decision**: Drop-in replacement of `serde_yaml` with `serde_yml` across all files.
-
-**Rationale**: `serde_yml` is the community-maintained fork of the deprecated `serde_yaml`. The API is compatible — the migration is primarily a find-and-replace of the crate name in imports and `Cargo.toml`.
-
-**Implications**:
-- `Cargo.toml`: Replace `serde_yaml = "0.9.34"` with `serde_yml = "0.0.12"` (or latest)
-- All `serde_yaml::` references in `main.rs`, `strucs.rs`, and `tests/smoke_test.rs` become `serde_yml::`
-- Types like `serde_yaml::Value`, `serde_yaml::Mapping`, `serde_yaml::Sequence` become `serde_yml::Value`, etc.
-
-### ADR-3: DetectorType as Enum
+### ADR-2: DetectorType as Enum
 
 **Decision**: Replace string-based detector dispatch with a `DetectorType` enum that implements serde `Deserialize`.
 
@@ -83,19 +72,7 @@ src/
 - `Detector.type_` field changes from `String` to `DetectorType`
 - `run_detector` takes `DetectorType` instead of `String`, uses `match` on enum
 
-### ADR-4: Security Validation Placement
-
-**Decision**: All input validation happens early in `main()`, before calling into business logic functions.
-
-**Rationale**: Fail fast with clear error messages. This keeps validation separate from business logic and is compatible with the Enhancement PRD's plan to extract `main.rs` into a thin CLI wrapper. Validation stays in the CLI layer.
-
-**Implications**:
-- `search_dir` existence and is-directory check in `main()` after argument parsing
-- Config file size check inside `load_configs()` before `read_to_string`
-- Regex length check inside `detector_has_file_matching()` before `Regex::new()`
-- Symlink setting on `WalkDir::new()` inside `generate_dependabot_config()`
-
-### ADR-5: Hard Break for Identifier Rename
+### ADR-3: Hard Break for Identifier Rename
 
 **Decision**: `DIRECOTRY_HAS_FILE_FILE_MATCHING` is replaced with `DIRECTORY_HAS_FILE_MATCHING` with no backward compatibility.
 
@@ -104,6 +81,11 @@ src/
 **Implications**:
 - All source code, examples, README, and test fixtures update to new identifier
 - Old config files will fail with a clear serde deserialization error (unknown variant)
+
+### Implementation Notes
+
+- **serde_yaml → serde_yml migration**: Drop-in replacement. `serde_yml` is the community-maintained fork of the deprecated `serde_yaml` with a compatible API. The migration is a find-and-replace of the crate name in `Cargo.toml`, imports, and type references across `main.rs`, `strucs.rs`, and `tests/smoke_test.rs`. Before adoption, the coding expert should verify `serde_yml` legitimacy: check crates.io download counts, maintainer reputation, and the RustSec advisory database for known vulnerabilities.
+- **Input validation placement**: Each validation check lives where the relevant data is first available. `search_dir` existence check goes in `main()` (CLI boundary). Config file size check goes in `load_configs()` (before `read_to_string`). Regex length check goes in `detector_has_file_matching()` (before `Regex::new`). Symlink disabling is a `WalkDir` builder option in `generate_dependabot_config()`. This keeps each function responsible for validating its own inputs, which aligns with the Enhancement PRD's planned module extraction.
 
 ---
 
@@ -130,33 +112,17 @@ src/
 
 ### Interface Changes
 
-#### `src/main.rs` — Function Signatures After Stabilization
+**Return type changes** (all functions in `src/main.rs` that currently return bare values):
 
-```rust
-// main returns Result
-fn main() -> anyhow::Result<()>
+| Function | Current Return | New Return |
+|----------|---------------|------------|
+| `main()` | `()` | `anyhow::Result<()>` |
+| `load_configs()` | `Config` | `anyhow::Result<Config>` |
+| `generate_dependabot_config()` | `serde_yaml::Value` | `anyhow::Result<serde_yml::Value>` |
+| `run_detector()` | `bool` | `anyhow::Result<bool>` |
+| `detector_has_file_matching()` | `bool` | `anyhow::Result<bool>` |
 
-// All functions that can fail return Result
-fn detector_has_file_matching(dir_path: PathBuf, regex_pattern: &str) -> anyhow::Result<bool>
-
-pub fn run_detector(
-    detector_type: &DetectorType,      // was: String
-    detector_config: &serde_yml::Value, // was: serde_yaml::Value (owned)
-    dir_path: &Path,                    // was: PathBuf (owned)
-) -> anyhow::Result<bool>             // was: bool
-
-pub fn generate_dependabot_config(
-    config: &Config,                    // was: Config (owned)
-    search_dir: &Path,                  // was: PathBuf (owned)
-) -> anyhow::Result<serde_yml::Value>  // was: serde_yaml::Value (no Result)
-
-pub fn load_configs(
-    enable_default_rules: bool,
-    extra_configuration_file: Option<&Path>, // was: Option<PathBuf>
-) -> anyhow::Result<Config>            // was: Config (no Result)
-```
-
-Note: The shift from owned to borrowed parameters (`&Path` instead of `PathBuf`, `&DetectorType` instead of owned) reduces unnecessary cloning. Coding experts may adjust borrow vs owned based on actual usage patterns — these signatures are directional, not prescriptive.
+**Parameter type changes**: `run_detector`'s first parameter changes from `String` to `DetectorType` (enum). All `serde_yaml::` types become `serde_yml::`. Exact parameter signatures (borrow vs. owned, etc.) are left to the coding expert's discretion.
 
 #### `src/structs.rs` (renamed from `strucs.rs`) — New Type
 
@@ -178,8 +144,10 @@ pub struct Detector {
 
 | Constant | Value | Location | Purpose |
 |----------|-------|----------|---------|
-| Max regex pattern length | 1024 chars | `detector_has_file_matching` | ReDoS prevention |
+| Max regex pattern length | 1024 chars | `detector_has_file_matching` | Defense-in-depth input bound |
 | Max config file size | 1 MB (1_048_576 bytes) | `load_configs` | Memory exhaustion prevention |
+
+Note: Rust's `regex` crate guarantees linear-time matching (no backtracking), so ReDoS is not a risk with the default engine. The 1024-char limit is defense-in-depth against unexpectedly large patterns, not a primary ReDoS mitigation.
 
 ---
 
@@ -275,42 +243,24 @@ However, the acceptance criteria require **manual verification** or **CI validat
 
 ## Coding Expert Assignment
 
-### Work Package Parallelism
+### 1 Coding Expert, 2 PRs
 
-```
-         ┌──── WP1 (Error Handling) ──────┐
-         │                                 ▼
-Start ───┼──── WP5 (Metadata/Docs) ──── WP3 (Security) ──── Done
-         │                                                    ▲
-         └──── WP2 (serde Migration) ──── WP4 (Naming) ──────┘
-```
+The codebase is 189 lines across 2 source files. A single expert avoids all coordination overhead and merge conflicts. The work is split into 2 PRs for reviewability:
 
-WP1, WP2, and WP5 are independent. WP3 depends on WP1. WP4 depends on WP2.
+**PR 1 — Foundation & Migration (WP5, WP1, WP2)**:
+- WP5: Add Cargo.toml metadata, create `.github/dependabot.yml`, fix README typo, update TODO.md, update LICENSE year, add clap help text, create `.editorconfig` and `rustfmt.toml`
+- WP1: Add `anyhow`, replace all 17 unwraps with `?` + `.context()`, fix logger init order, change function return types to `anyhow::Result<T>`
+- WP2: Replace `serde_yaml` with `serde_yml` across all files (Cargo.toml, main.rs, strucs.rs, smoke_test.rs)
 
-### Recommended Expert Split: 2 Coding Experts
+**PR 2 — Security & Quality (WP3, WP4)**:
+- WP3: Disable symlink following, pin GitHub Actions to SHAs, add regex length limit, add search_dir validation, add config file size limit, create `SECURITY.md`
+- WP4: Rename `strucs.rs` → `structs.rs`, fix comment typos, rename `DIRECOTRY_HAS_FILE_FILE_MATCHING` → `DIRECTORY_HAS_FILE_MATCHING`, create `DetectorType` enum, remove debug `println!` from tests, update examples and README
 
-Given the small codebase (189 lines) and file overlap, 2 experts is the right number. More would cause merge conflicts on `main.rs`.
+PR 2 depends on PR 1 (WP3 needs WP1's error handling; WP4 needs WP2's serde migration).
 
-**Expert A — Error Handling + Security (WP1 → WP3)**:
-- WP1: Add `anyhow`, replace 17 unwraps, fix logger order, change function signatures to return `Result`
-- WP3: Add symlink disable, pin Actions, add regex length limit, add search_dir validation, add config file size limit, create `SECURITY.md`
-- Sequential because WP3 depends on WP1's error handling for validation error paths
+### Recommended Execution Order
 
-**Expert B — Migration + Naming + Metadata (WP2 → WP4, WP5)**:
-- WP5: Add Cargo.toml metadata, create dependabot.yml, fix README, update TODO.md, update LICENSE year, add clap help text, create .editorconfig and rustfmt.toml
-- WP2: Replace serde_yaml with serde_yml across all files
-- WP4: Rename strucs.rs → structs.rs, fix comment typos, rename identifier, create DetectorType enum, remove debug println, update examples and README
-- WP5 is independent; WP2 → WP4 is sequential
-
-### Merge Order
-
-1. **WP5** merges first (no code logic changes, metadata only — lowest conflict risk)
-2. **WP1** merges second (changes function signatures but not types)
-3. **WP2** merges third (changes type references across files)
-4. **WP3** merges fourth (adds validation using WP1's error handling)
-5. **WP4** merges last (renames file and identifiers — highest touch count)
-
-Each WP should be a separate PR stacked on the previous, targeting the stabilization integration branch.
+Within each PR, the expert should apply changes in WP order (WP5 → WP1 → WP2, then WP3 → WP4) and run `cargo test` after each WP to catch regressions early.
 
 ---
 
