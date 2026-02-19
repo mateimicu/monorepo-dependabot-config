@@ -10,7 +10,7 @@
 - [x] Have a configuration file to specify extra rules
 - [~] Have default rules for common package ecosystems
 
-## Quick Star
+## Quick Start
 
 Just run the `monorepo-dependabot-config .` command in the root of your monorepo.
 It will generate a dependabot configuration file based on the package ecosystems it finds in the monorepo.

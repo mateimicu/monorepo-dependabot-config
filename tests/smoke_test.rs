@@ -1,4 +1,4 @@
-use serde_yaml;
+use serde_yml;
 use std::fs;
 
 #[test]
@@ -26,9 +26,8 @@ fn execute_examples_with_no_default_config() {
         let expected_output_raw = fs::read_to_string(expected_output_file).unwrap();
         let output_raw = String::from_utf8(process_output.stdout).unwrap();
 
-        let expected_output: serde_yaml::Value =
-            serde_yaml::from_str(&expected_output_raw).unwrap();
-        let output: serde_yaml::Value = serde_yaml::from_str(&output_raw).unwrap();
+        let expected_output: serde_yml::Value = serde_yml::from_str(&expected_output_raw).unwrap();
+        let output: serde_yml::Value = serde_yml::from_str(&output_raw).unwrap();
 
         println!("Expected output: {:#?}", expected_output);
         println!("Output: {:#?}", output);

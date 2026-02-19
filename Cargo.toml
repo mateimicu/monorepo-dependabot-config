@@ -5,14 +5,18 @@ edition = "2021"
 
 description = "A tool to generate Dependabot configuration for a monorepo with multiple languages"
 license = "MIT"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+repository = "https://github.com/mateimicu/monorepo-dependabot-config"
+homepage = "https://github.com/mateimicu/monorepo-dependabot-config"
+readme = "README.md"
+keywords = ["dependabot", "monorepo", "configuration", "dependency-management"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
+anyhow = "1"
 clap = { version = "4.5", features = ["derive"] }
 env_logger = "0.10.2"
 log = "0.4.29"
 regex = "1.12.3"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_yaml = "0.9.34"
+serde_yml = "0.0.12"
 walkdir = "2.5.0"
