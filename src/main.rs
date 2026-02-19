@@ -40,7 +40,7 @@ fn detector_has_file_matching(dir_path: PathBuf, regex_pattern: String) -> anyho
 
 pub fn run_detector(
     detector_type: String,
-    detector_config: serde_yaml::Value,
+    detector_config: serde_yml::Value,
     dir_path: PathBuf,
 ) -> anyhow::Result<bool> {
     log::debug!(
@@ -49,7 +49,7 @@ pub fn run_detector(
         dir_path
             .to_str()
             .context("Path contains invalid UTF-8")?,
-        serde_yaml::to_string(&detector_config).context("Failed to serialize detector config")?
+        serde_yml::to_string(&detector_config).context("Failed to serialize detector config")?
     );
 
     match detector_type.as_str() {
@@ -68,16 +68,16 @@ pub fn run_detector(
 pub fn generate_dependabot_config(
     config: Config,
     search_dir: PathBuf,
-) -> anyhow::Result<serde_yaml::Value> {
+) -> anyhow::Result<serde_yml::Value> {
     // recursevely search the search_dir
     // for each directory found run the generator
     // for each generator call the appropiate Detector
     // if detector matches then append to the raw yaml
     // a generated block with a directory overwrite
     // and return the file
-    let mut dependabot_config = serde_yaml::Value::Mapping(serde_yaml::Mapping::new());
-    dependabot_config["version"] = serde_yaml::Value::String("2".to_string());
-    dependabot_config["updates"] = serde_yaml::Value::Sequence(serde_yaml::Sequence::new());
+    let mut dependabot_config = serde_yml::Value::Mapping(serde_yml::Mapping::new());
+    dependabot_config["version"] = serde_yml::Value::String("2".to_string());
+    dependabot_config["updates"] = serde_yml::Value::Sequence(serde_yml::Sequence::new());
     // search recursevely the search_dir
     let walker = walkdir::WalkDir::new(search_dir.clone());
     for entry in walker {
@@ -100,8 +100,8 @@ pub fn generate_dependabot_config(
                         .context("Generated block is not a YAML mapping")?;
                     let mut generated_block = generated_block.clone();
                     generated_block.insert(
-                        serde_yaml::Value::String("directory".to_string()),
-                        serde_yaml::Value::String(
+                        serde_yml::Value::String("directory".to_string()),
+                        serde_yml::Value::String(
                             path.strip_prefix(search_dir.clone())
                                 .context("Failed to strip search directory prefix from path")?
                                 .to_str()
@@ -109,7 +109,7 @@ pub fn generate_dependabot_config(
                                 .to_string(),
                         ),
                     );
-                    let generated_block = serde_yaml::Value::Mapping(generated_block);
+                    let generated_block = serde_yml::Value::Mapping(generated_block);
                     dependabot_config["updates"]
                         .as_sequence_mut()
                         .context("Updates field is not a YAML sequence")?
@@ -130,7 +130,7 @@ pub fn load_configs(
     };
     if enable_default_rules {
         log::debug!("Default rules are enabled");
-        config = serde_yaml::from_str(DEFAULT_RULES).context("Failed to parse default rules")?;
+        config = serde_yml::from_str(DEFAULT_RULES).context("Failed to parse default rules")?;
     }
     if let Some(extra_configuration_file) = extra_configuration_file {
         let raw_config = std::fs::read_to_string(&extra_configuration_file).with_context(|| {
@@ -140,7 +140,7 @@ pub fn load_configs(
             )
         })?;
         let extra_config: Config =
-            serde_yaml::from_str(&raw_config).context("Failed to parse extra configuration")?;
+            serde_yml::from_str(&raw_config).context("Failed to parse extra configuration")?;
         config.generators.extend(extra_config.generators);
     } else {
         log::debug!("No extra configuration file defined");
@@ -159,7 +159,7 @@ fn main() -> anyhow::Result<()> {
 
     println!(
         "{}",
-        serde_yaml::to_string(&dependabot_config).context("Failed to serialize output YAML")?
+        serde_yml::to_string(&dependabot_config).context("Failed to serialize output YAML")?
     );
     Ok(())
 }

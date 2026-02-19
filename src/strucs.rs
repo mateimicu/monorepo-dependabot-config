@@ -27,14 +27,14 @@ pub struct Cli {
 pub struct Detector {
     #[serde(rename = "type")]
     pub type_: String,
-    pub config: serde_yaml::Value,
+    pub config: serde_yml::Value,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Generator {
     pub detector: Detector,
     // this can be any yaml value
-    pub generated_block: serde_yaml::Value,
+    pub generated_block: serde_yml::Value,
 }
 
 #[derive(Deserialize, Serialize)]
