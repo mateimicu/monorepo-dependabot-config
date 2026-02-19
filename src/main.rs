@@ -16,9 +16,7 @@ fn detector_has_file_matching(dir_path: PathBuf, regex_pattern: String) -> anyho
 
     log::debug!("Evaluating paths {:?}", paths);
     for path in paths {
-        let path = path
-            .context("Failed to read directory entry")?
-            .path();
+        let path = path.context("Failed to read directory entry")?.path();
         log::debug!(
             "Evaluating {}",
             path.to_str().context("Path contains invalid UTF-8")?
@@ -46,9 +44,7 @@ pub fn run_detector(
     log::debug!(
         "Running detector: {} on path {} with config {}",
         detector_type,
-        dir_path
-            .to_str()
-            .context("Path contains invalid UTF-8")?,
+        dir_path.to_str().context("Path contains invalid UTF-8")?,
         serde_yml::to_string(&detector_config).context("Failed to serialize detector config")?
     );
 
