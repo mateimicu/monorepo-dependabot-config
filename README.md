@@ -52,7 +52,7 @@ where the configuration is
 # extra-config.yml
 generators:
 - detector:
-    type: DIRECOTRY_HAS_FILE_FILE_MATCHING
+    type: DIRECTORY_HAS_FILE_MATCHING
     config:
       regex: ".*.tf"
   generated_block:
@@ -60,7 +60,7 @@ generators:
     schedule:
       interval: daily
 - detector:
-    type: DIRECOTRY_HAS_FILE_FILE_MATCHING
+    type: DIRECTORY_HAS_FILE_MATCHING
     config:
       regex: ".*.hcl"
   generated_block:
@@ -99,7 +99,7 @@ The config file could have
 ```yaml
 generate:
 - detector:
-  direcotry-has-file-file-matching:
+  directory-has-file-matching:
     regex: "aaa"
   generated_block:
     TBD

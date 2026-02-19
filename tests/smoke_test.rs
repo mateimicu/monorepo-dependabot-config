@@ -29,9 +29,6 @@ fn execute_examples_with_no_default_config() {
         let expected_output: serde_yml::Value = serde_yml::from_str(&expected_output_raw).unwrap();
         let output: serde_yml::Value = serde_yml::from_str(&output_raw).unwrap();
 
-        println!("Expected output: {:#?}", expected_output);
-        println!("Output: {:#?}", output);
-
         assert_eq!(expected_output["version"], output["version"]);
 
         // Because we have a list of `updates` the order matters. Depending

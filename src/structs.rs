@@ -28,29 +28,28 @@ pub struct Cli {
         help = "Root directory to search for packages recursively"
     )]
     pub search_dir: PathBuf,
-    // Ideas:
-    // *  We could also add a command to check if a generated config matches
-    //    the current configuration given the path
-    // * Also we could configure if we dump the generated config to stdout
-    //   or to a file
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub enum DetectorType {
+    #[serde(rename = "DIRECTORY_HAS_FILE_MATCHING")]
+    DirectoryHasFileMatching,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Detector {
     #[serde(rename = "type")]
-    pub type_: String,
+    pub type_: DetectorType,
     pub config: serde_yml::Value,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Generator {
     pub detector: Detector,
-    // this can be any yaml value
     pub generated_block: serde_yml::Value,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Config {
-    // The rules to run
     pub generators: Vec<Generator>,
 }

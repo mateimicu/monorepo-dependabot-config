@@ -3,13 +3,21 @@ use clap::Parser;
 use regex::Regex;
 use std::fs::read_dir;
 use std::path::PathBuf;
-use strucs::{Cli, Config};
+use structs::{Cli, Config, DetectorType};
 
-mod strucs;
+mod structs;
 
 const DEFAULT_RULES: &str = include_str!("default_rules.yaml");
+const MAX_REGEX_PATTERN_LENGTH: usize = 1024;
+const MAX_CONFIG_FILE_SIZE: u64 = 1_048_576; // 1 MB
 
 fn detector_has_file_matching(dir_path: PathBuf, regex_pattern: String) -> anyhow::Result<bool> {
+    if regex_pattern.len() > MAX_REGEX_PATTERN_LENGTH {
+        bail!(
+            "Regex pattern exceeds maximum length of {} characters",
+            MAX_REGEX_PATTERN_LENGTH
+        );
+    }
     let re = Regex::new(&regex_pattern).context("Failed to compile regex pattern")?;
     let paths = read_dir(&dir_path)
         .with_context(|| format!("Failed to read directory '{}'", dir_path.display()))?;
@@ -37,26 +45,23 @@ fn detector_has_file_matching(dir_path: PathBuf, regex_pattern: String) -> anyho
 }
 
 pub fn run_detector(
-    detector_type: String,
+    detector_type: &DetectorType,
     detector_config: serde_yml::Value,
     dir_path: PathBuf,
 ) -> anyhow::Result<bool> {
     log::debug!(
-        "Running detector: {} on path {} with config {}",
+        "Running detector: {:?} on path {} with config {}",
         detector_type,
         dir_path.to_str().context("Path contains invalid UTF-8")?,
         serde_yml::to_string(&detector_config).context("Failed to serialize detector config")?
     );
 
-    match detector_type.as_str() {
-        "DIRECOTRY_HAS_FILE_FILE_MATCHING" => {
+    match detector_type {
+        DetectorType::DirectoryHasFileMatching => {
             let regex_pattern = detector_config["regex"]
                 .as_str()
                 .context("Detector config missing 'regex' field")?;
             detector_has_file_matching(dir_path, regex_pattern.to_string())
-        }
-        _ => {
-            bail!("Unknown detector type '{}'", detector_type);
         }
     }
 }
@@ -65,17 +70,17 @@ pub fn generate_dependabot_config(
     config: Config,
     search_dir: PathBuf,
 ) -> anyhow::Result<serde_yml::Value> {
-    // recursevely search the search_dir
+    // Recursively search the search_dir
     // for each directory found run the generator
-    // for each generator call the appropiate Detector
+    // for each generator call the appropriate detector
     // if detector matches then append to the raw yaml
     // a generated block with a directory overwrite
     // and return the file
     let mut dependabot_config = serde_yml::Value::Mapping(serde_yml::Mapping::new());
     dependabot_config["version"] = serde_yml::Value::String("2".to_string());
     dependabot_config["updates"] = serde_yml::Value::Sequence(serde_yml::Sequence::new());
-    // search recursevely the search_dir
-    let walker = walkdir::WalkDir::new(search_dir.clone());
+    // Search recursively the search_dir
+    let walker = walkdir::WalkDir::new(search_dir.clone()).follow_links(false);
     for entry in walker {
         let entry = entry.context("Failed to read directory entry during walk")?;
         let path = entry.path();
@@ -85,11 +90,7 @@ pub fn generate_dependabot_config(
                 let detector_type = &detector.type_;
                 let detector_config = &detector.config;
 
-                if run_detector(
-                    detector_type.to_string(),
-                    detector_config.clone(),
-                    path.to_path_buf(),
-                )? {
+                if run_detector(detector_type, detector_config.clone(), path.to_path_buf())? {
                     let generated_block = &generator.generated_block;
                     let generated_block = generated_block
                         .as_mapping()
@@ -129,6 +130,22 @@ pub fn load_configs(
         config = serde_yml::from_str(DEFAULT_RULES).context("Failed to parse default rules")?;
     }
     if let Some(extra_configuration_file) = extra_configuration_file {
+        let file_size = std::fs::metadata(&extra_configuration_file)
+            .with_context(|| {
+                format!(
+                    "Failed to read metadata for configuration file '{}'",
+                    extra_configuration_file.display()
+                )
+            })?
+            .len();
+        if file_size > MAX_CONFIG_FILE_SIZE {
+            bail!(
+                "Configuration file '{}' exceeds maximum size of {} bytes (actual: {} bytes)",
+                extra_configuration_file.display(),
+                MAX_CONFIG_FILE_SIZE,
+                file_size
+            );
+        }
         let raw_config = std::fs::read_to_string(&extra_configuration_file).with_context(|| {
             format!(
                 "Failed to read configuration file '{}'",
@@ -148,6 +165,19 @@ fn main() -> anyhow::Result<()> {
     env_logger::init();
     let args = Cli::parse();
     log::debug!("Args: {:?}", args);
+
+    if !args.search_dir.exists() {
+        bail!(
+            "Search directory '{}' does not exist",
+            args.search_dir.display()
+        );
+    }
+    if !args.search_dir.is_dir() {
+        bail!(
+            "Search path '{}' is not a directory",
+            args.search_dir.display()
+        );
+    }
 
     let config = load_configs(args.enable_default_rules, args.extra_configuration_file)?;
 
