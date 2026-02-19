@@ -8,8 +8,16 @@ use strucs::{Cli, Config};
 mod strucs;
 
 const DEFAULT_RULES: &str = include_str!("default_rules.yaml");
+const MAX_REGEX_PATTERN_LENGTH: usize = 1024;
+const MAX_CONFIG_FILE_SIZE: u64 = 1_048_576; // 1 MB
 
 fn detector_has_file_matching(dir_path: PathBuf, regex_pattern: String) -> anyhow::Result<bool> {
+    if regex_pattern.len() > MAX_REGEX_PATTERN_LENGTH {
+        bail!(
+            "Regex pattern exceeds maximum length of {} characters",
+            MAX_REGEX_PATTERN_LENGTH
+        );
+    }
     let re = Regex::new(&regex_pattern).context("Failed to compile regex pattern")?;
     let paths = read_dir(&dir_path)
         .with_context(|| format!("Failed to read directory '{}'", dir_path.display()))?;
@@ -75,7 +83,7 @@ pub fn generate_dependabot_config(
     dependabot_config["version"] = serde_yml::Value::String("2".to_string());
     dependabot_config["updates"] = serde_yml::Value::Sequence(serde_yml::Sequence::new());
     // search recursevely the search_dir
-    let walker = walkdir::WalkDir::new(search_dir.clone());
+    let walker = walkdir::WalkDir::new(search_dir.clone()).follow_links(false);
     for entry in walker {
         let entry = entry.context("Failed to read directory entry during walk")?;
         let path = entry.path();
@@ -129,6 +137,22 @@ pub fn load_configs(
         config = serde_yml::from_str(DEFAULT_RULES).context("Failed to parse default rules")?;
     }
     if let Some(extra_configuration_file) = extra_configuration_file {
+        let file_size = std::fs::metadata(&extra_configuration_file)
+            .with_context(|| {
+                format!(
+                    "Failed to read metadata for configuration file '{}'",
+                    extra_configuration_file.display()
+                )
+            })?
+            .len();
+        if file_size > MAX_CONFIG_FILE_SIZE {
+            bail!(
+                "Configuration file '{}' exceeds maximum size of {} bytes (actual: {} bytes)",
+                extra_configuration_file.display(),
+                MAX_CONFIG_FILE_SIZE,
+                file_size
+            );
+        }
         let raw_config = std::fs::read_to_string(&extra_configuration_file).with_context(|| {
             format!(
                 "Failed to read configuration file '{}'",
@@ -148,6 +172,19 @@ fn main() -> anyhow::Result<()> {
     env_logger::init();
     let args = Cli::parse();
     log::debug!("Args: {:?}", args);
+
+    if !args.search_dir.exists() {
+        bail!(
+            "Search directory '{}' does not exist",
+            args.search_dir.display()
+        );
+    }
+    if !args.search_dir.is_dir() {
+        bail!(
+            "Search path '{}' is not a directory",
+            args.search_dir.display()
+        );
+    }
 
     let config = load_configs(args.enable_default_rules, args.extra_configuration_file)?;
 
